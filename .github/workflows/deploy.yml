@@ -23,9 +23,10 @@ jobs:
     - name: Run tests
       run: npm test  --if-present
  
-    - name: Build Docker image
-      run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/users-service:latest .
+    - name: Build Docker Image
+  working-directory: ../../users-service
+  run: |
+    docker build -t ${{ secrets.DOCKER_USERNAME }}/users-service:latest .
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3

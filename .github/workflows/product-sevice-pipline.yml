@@ -1,0 +1,79 @@
+name: products Service Pipeline
+
+on:
+  push:
+    branches: ["master"]
+    # Optional: Only trigger this workflow if files in 'products-service' change
+    paths:
+      - 'products-service/**'
+      - '.github/workflows/products-service.yml'
+
+jobs:
+  build-products:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: "18"
+
+    # --- NODE STEPS (Run inside the products-service folder) ---
+    - name: Install dependencies
+      working-directory: ../../products-service
+      run: npm install
+
+    - name: Run tests
+      working-directory: ../../products-service
+      run: npm test --if-present
+
+    # --- DOCKER STEPS ---
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        # Context tells Docker to look inside this specific folder
+        context: ../../products-service
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/products-service:latest
+
+  deploy-products:
+    needs: build-products
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # --- DEPLOYMENT STEPS ---
+    # Make sure your K8s files are actually in a root 'k8s' folder. 
+    # If they are inside 'products-service/k8s', change source to "./products-service/k8s/*"
+    - name: Copy manifest files to server
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "./k8s/*"  
+        target: "~/app/k8s"
+
+    - name: Apply Kubernetes manifests
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd ~/app/k8s
+          # Apply the configuration
+          kubectl apply -f .
+          # Force a restart so the pod picks up the new image
+          kubectl rollout restart deployment products-deployment

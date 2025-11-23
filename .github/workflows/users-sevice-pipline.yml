@@ -23,11 +23,11 @@ jobs:
 
     # --- NODE STEPS (Run inside the users-service folder) ---
     - name: Install dependencies
-      working-directory: ../../users-service
+      working-directory: ./users-service
       run: npm install
 
     - name: Run tests
-      working-directory: ../../users-service
+      working-directory: ./users-service
       run: npm test --if-present
 
     # --- DOCKER STEPS ---
@@ -41,7 +41,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         # Context tells Docker to look inside this specific folder
-        context: ../../users-service
+        context: ./users-service
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/users-service:latest
 
